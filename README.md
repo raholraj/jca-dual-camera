@@ -1,34 +1,22 @@
 # JCA Dual Camera — Advanced
 
-Advanced dual-camera recording for Google's Jetpack Camera App.
+## Dual Camera kaise ON karein (phone pe)
 
-## Features
+1. App install + open karo
+2. **Settings** (gear / settings icon) kholo
+3. **Concurrent Camera** option **ON** karo
+4. Wapas camera pe aao
+5. **Video mode** select karo
+6. Record dabao — front + back dono cameras chalenge (PIP layout)
 
-### Dual Recording Modes
-- **PIP** — Front camera overlay on back camera (single file)
-- **Side-by-Side** — 50/50 split in one file
-- **Separate Files** — Each camera saves its own `.mp4`
+### Agar Concurrent Camera nahi dikhta
+- Phone concurrent front+back support nahi karta
+- Ya option Settings me neeche scroll karke dhoondo
 
-### Advanced PIP Overlay
-- Free **drag** anywhere on screen
-- **Pinch** to resize
-- **4 corner handles** for precise resize
-- **Double-tap** to reset size/position
-- Edge clamping + live size % while resizing
+## PIP overlay
+- Box drag karke kahin bhi move
+- Pinch ya corner handles se resize
+- Double-tap se reset
 
-## How to get the APK (mobile friendly)
-
-1. Open this repo on GitHub: https://github.com/raholraj/jca-dual-camera
-2. Go to **Actions** tab
-3. Select **Build Dual Camera APK**
-4. Tap **Run workflow** → **Run workflow**
-5. Wait 10–20 minutes
-6. Open the finished run → download **dual-camera-apk** artifact
-7. Unzip and install the `.apk` on your phone
-
-## Requirements
-- Phone with concurrent front+back camera support
-- Allow install from unknown sources for debug APK
-
-## License
-Apache 2.0
+## Naya APK
+Actions → Build Dual Camera APK → Run workflow → Artifact download

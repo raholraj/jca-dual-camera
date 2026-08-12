@@ -8,7 +8,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 50
 
     steps:
       - name: Checkout
@@ -26,66 +26,54 @@ jobs:
       - name: Clone Jetpack Camera App
         run: git clone --depth 1 https://github.com/google/jetpack-camera-app.git jca
 
-      - name: Apply dual-camera patches
+      - name: Apply dual-camera feature files
         run: |
           set -e
           JCA=jca
-
           mkdir -p $JCA/core/model/src/main/java/com/google/jetpackcamera/model
-          if [ -f core/model/DualRecordingMode.kt ]; then
-            cp core/model/DualRecordingMode.kt $JCA/core/model/src/main/java/com/google/jetpackcamera/model/
-          fi
-
+          cp -f core/model/DualRecordingMode.kt $JCA/core/model/src/main/java/com/google/jetpackcamera/model/ 2>/dev/null || true
           mkdir -p $JCA/core/camera/src/main/java/com/google/jetpackcamera/core/camera
           for f in CoroutineCameraProvider.kt CameraSessionSettings.kt ConcurrentCameraSession.kt; do
-            if [ -f core/camera/$f ]; then
-              cp core/camera/$f $JCA/core/camera/src/main/java/com/google/jetpackcamera/core/camera/
-            fi
+            [ -f core/camera/$f ] && cp -f core/camera/$f $JCA/core/camera/src/main/java/com/google/jetpackcamera/core/camera/
           done
-
           mkdir -p $JCA/ui/controller/src/main/java/com/google/jetpackcamera/ui/controller
-          if [ -f ui/controller/DualCameraController.kt ]; then
-            cp ui/controller/DualCameraController.kt $JCA/ui/controller/src/main/java/com/google/jetpackcamera/ui/controller/
-          fi
+          [ -f ui/controller/DualCameraController.kt ] && cp -f ui/controller/DualCameraController.kt $JCA/ui/controller/src/main/java/com/google/jetpackcamera/ui/controller/
           mkdir -p $JCA/ui/controller/impl/src/main/java/com/google/jetpackcamera/ui/controller/impl
-          if [ -f ui/controller/DualCameraControllerImpl.kt ]; then
-            cp ui/controller/DualCameraControllerImpl.kt $JCA/ui/controller/impl/src/main/java/com/google/jetpackcamera/ui/controller/impl/
-          fi
-
+          [ -f ui/controller/DualCameraControllerImpl.kt ] && cp -f ui/controller/DualCameraControllerImpl.kt $JCA/ui/controller/impl/src/main/java/com/google/jetpackcamera/ui/controller/impl/
           mkdir -p $JCA/ui/components/capture/src/main/java/com/google/jetpackcamera/ui/components/capture
           for f in DualCameraComponents.kt CaptureLayout.kt; do
-            if [ -f ui/components/$f ]; then
-              cp ui/components/$f $JCA/ui/components/capture/src/main/java/com/google/jetpackcamera/ui/components/capture/
-            fi
+            [ -f ui/components/$f ] && cp -f ui/components/$f $JCA/ui/components/capture/src/main/java/com/google/jetpackcamera/ui/components/capture/
           done
+          echo Files applied
+          find $JCA -name DualRecordingMode.kt -o -name DualCameraComponents.kt -o -name ConcurrentCameraSession.kt | head
 
+      - name: Patch settings and system for dual camera
+        run: |
+          set -e
+          JCA=jca
+          SETTINGS=$JCA/core/settings/src/main/java/com/google/jetpackcamera/settings/model/CameraAppSettings.kt
+          if [ -f "$SETTINGS" ]; then
+            grep -q DualRecordingMode "$SETTINGS" || sed -i '/import com.google.jetpackcamera.model.ConcurrentCameraMode/a import com.google.jetpackcamera.model.DualRecordingMode' "$SETTINGS"
+            grep -q dualRecordingMode "$SETTINGS" || sed -i '/val concurrentCameraMode: ConcurrentCameraMode = ConcurrentCameraMode.OFF,/a\    val dualRecordingMode: DualRecordingMode = DualRecordingMode.PIP,' "$SETTINGS"
+            echo CameraAppSettings patched
+          fi
           SYS=$JCA/core/camera/src/main/java/com/google/jetpackcamera/core/camera/CameraSystem.kt
           if [ -f "$SYS" ] && ! grep -q setDualRecordingMode "$SYS"; then
             sed -i '/suspend fun setImageFormat/i\    suspend fun setDualRecordingMode(mode: com.google.jetpackcamera.model.DualRecordingMode)\n' "$SYS"
+            echo CameraSystem patched
           fi
-
-          SETTINGS=$JCA/core/settings/src/main/java/com/google/jetpackcamera/settings/model/CameraAppSettings.kt
-          if [ -f "$SETTINGS" ]; then
-            if ! grep -q DualRecordingMode "$SETTINGS"; then
-              sed -i '/import com.google.jetpackcamera.model.ConcurrentCameraMode/a\import com.google.jetpackcamera.model.DualRecordingMode' "$SETTINGS"
-            fi
-            if ! grep -q dualRecordingMode "$SETTINGS"; then
-              sed -i '/val concurrentCameraMode: ConcurrentCameraMode = ConcurrentCameraMode.OFF,/a\    val dualRecordingMode: DualRecordingMode = DualRecordingMode.PIP,' "$SETTINGS"
-            fi
+          CX=$JCA/core/camera/src/main/java/com/google/jetpackcamera/core/camera/CameraXCameraSystem.kt
+          if [ -f "$CX" ] && ! grep -q setDualRecordingMode "$CX"; then
+            sed -i '/override suspend fun setImageFormat/i\    override suspend fun setDualRecordingMode(mode: com.google.jetpackcamera.model.DualRecordingMode) {\n        currentSettings.update { old -> old?.copy(dualRecordingMode = mode) }\n    }\n' "$CX"
+            echo CameraXCameraSystem patched
           fi
-
           SESSION=$JCA/core/camera/src/main/java/com/google/jetpackcamera/core/camera/CameraSession.kt
           if [ -f "$SESSION" ]; then
             sed -i 's/private fun getPendingRecording(/internal fun getPendingRecording(/g' "$SESSION"
             sed -i 's/private suspend fun startVideoRecordingInternal(/internal suspend fun startVideoRecordingInternal(/g' "$SESSION"
+            echo CameraSession patched
           fi
-
-          CX=$JCA/core/camera/src/main/java/com/google/jetpackcamera/core/camera/CameraXCameraSystem.kt
-          if [ -f "$CX" ] && ! grep -q setDualRecordingMode "$CX"; then
-            sed -i '/override suspend fun setImageFormat/i\    override suspend fun setDualRecordingMode(mode: com.google.jetpackcamera.model.DualRecordingMode) {\n        currentSettings.update { old -> old?.copy(dualRecordingMode = mode) }\n    }\n' "$CX"
-          fi
-
-          echo "Patches applied"
+          echo All patches done
 
       - name: Make gradlew executable
         run: chmod +x jca/gradlew
